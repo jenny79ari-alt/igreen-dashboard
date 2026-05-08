@@ -6,6 +6,81 @@
 <title>iGreen Energy — Gestão de Inadimplência</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<!-- Firebase SDK -->
+<script type="module">
+  import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+  import { getFirestore, doc, setDoc, getDoc, onSnapshot, deleteDoc } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+
+  // ── Configure com seu projeto Firebase ──────────────────────────────
+  // INSTRUÇÕES: Crie um projeto gratuito em https://console.firebase.google.com
+  // Copie as credenciais do seu projeto aqui:
+  const firebaseConfig = {
+    apiKey: "COLE_SUA_API_KEY_AQUI",
+    authDomain: "SEU_PROJETO.firebaseapp.com",
+    projectId: "SEU_PROJETO_ID",
+    storageBucket: "SEU_PROJETO.appspot.com",
+    messagingSenderId: "000000000000",
+    appId: "1:000000000000:web:000000000000000000"
+  };
+  // ────────────────────────────────────────────────────────────────────
+
+  const app = initializeApp(firebaseConfig);
+  const firestore = getFirestore(app);
+
+  // Expõe globalmente para o resto do código
+  window._firestore = firestore;
+  window._fsDoc = doc;
+  window._fsSetDoc = setDoc;
+  window._fsGetDoc = getDoc;
+  window._fsOnSnapshot = onSnapshot;
+  window._fsDeleteDoc = deleteDoc;
+
+  // Escuta mudanças em tempo real no recado ativo
+  let _notifUnsubscribe = null;
+  window._listenNotificacoes = function(callback){
+    if(_notifUnsubscribe) _notifUnsubscribe();
+    _notifUnsubscribe = onSnapshot(doc(firestore,'igreen','notificacao'), snap=>{
+      if(snap.exists()){
+        const data = snap.data();
+        db.notificacoes = data.ativo ? [data] : [];
+        db.recadosHistorico = data.historico || [];
+      } else {
+        db.notificacoes = [];
+      }
+      if(callback) callback();
+    });
+  };
+
+  window._salvarRecadoFirebase = async function(notif){
+    const ref = doc(firestore,'igreen','notificacao');
+    const snap = await getDoc(ref);
+    const hist = snap.exists() ? (snap.data().historico||[]) : [];
+    hist.unshift({...notif});
+    await setDoc(ref, { ativo: true, ...notif, historico: hist });
+  };
+
+  window._removerRecadoFirebase = async function(){
+    const ref = doc(firestore,'igreen','notificacao');
+    const snap = await getDoc(ref);
+    const hist = snap.exists() ? (snap.data().historico||[]) : [];
+    await setDoc(ref, { ativo: false, historico: hist });
+  };
+
+  window._atualizarHistoricoFirebase = async function(newHist){
+    const ref = doc(firestore,'igreen','notificacao');
+    const snap = await getDoc(ref);
+    if(snap.exists()){
+      const data = snap.data();
+      await setDoc(ref, {...data, historico: newHist});
+    }
+  };
+
+  window._firebaseReady = true;
+  // Inicia escuta após app carregar
+  document.addEventListener('igreen-app-ready', ()=>{
+    window._listenNotificacoes(()=>renderNotifBanner());
+  });
+</script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
 :root{
@@ -227,6 +302,28 @@ tbody tr:hover td{background:var(--gray-50);}
 .month-pill.active{background:var(--green);color:white;border-color:var(--green);}
 
 .search-box{position:relative;}
+
+/* RECADOS — new features */
+.notif-banner{position:relative;}
+.notif-reactions{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap;}
+.reaction-btn{background:rgba(0,0,0,0.06);border:none;border-radius:99px;padding:4px 10px;font-size:13px;cursor:pointer;transition:all .15s;font-family:var(--font);}
+.reaction-btn:hover,.reaction-btn.mine{background:rgba(0,0,0,0.14);transform:scale(1.08);}
+.notif-badge{position:absolute;top:-4px;right:-4px;width:10px;height:10px;background:var(--red);border-radius:50%;border:2px solid white;}
+.nav-item .badge-dot{width:8px;height:8px;background:var(--red);border-radius:50%;margin-left:auto;flex-shrink:0;}
+.read-check{display:inline-flex;align-items:center;gap:5px;font-size:12px;padding:4px 10px;border-radius:99px;cursor:pointer;border:1.5px solid;transition:all .15s;font-family:var(--font);}
+.read-check.done{background:#f0fdf4;color:#1a7a45;border-color:#bbf7d0;}
+.read-check.pending{background:var(--gray-50);color:var(--gray-500);border-color:var(--gray-200);}
+.notif-meta-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:8px;}
+.read-avatars{display:flex;gap:-4px;}
+.notif-priority-high .notif-banner{border-width:2px;box-shadow:0 4px 16px rgba(0,0,0,0.12);}
+.comment-input{width:100%;border:1.5px solid var(--gray-200);border-radius:var(--radius);padding:8px 12px;font-family:var(--font);font-size:13px;resize:none;outline:none;transition:border-color .15s;}
+.comment-input:focus{border-color:var(--green);}
+.comment-item{padding:8px 12px;background:rgba(0,0,0,0.03);border-radius:var(--radius);margin-top:6px;font-size:13px;}
+.meta-tag{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:99px;font-size:11px;font-weight:500;}
+.meta-tag.expira{background:#fef9c3;color:#854d0e;}
+.meta-tag.direcao{background:#eff6ff;color:#1d4ed8;}
+.meta-tag.meta-num{background:#f0fdf4;color:#166534;}
+
 
 /* NOTIFICAÇÃO BANNER */
 .notif-banner{border-radius:var(--radius-lg);padding:16px 20px;margin-bottom:20px;display:flex;align-items:flex-start;gap:14px;position:relative;border:1.5px solid;}
@@ -520,32 +617,62 @@ tbody tr:hover td{background:var(--gray-50);}
 
     <div class="content">
 
+      <!-- BANNER GLOBAL — visível para TODOS em qualquer aba -->
+      <div id="globalNotifBannerWrap" style="display:none;margin-bottom:0"></div>
+
       <!-- OVERVIEW -->
       <div id="pageOverview" class="page">
-        <!-- NOTIFICAÇÃO ATIVA -->
-        <div id="notifBannerWrap" style="display:none"></div>
         <!-- GERENCIAR RECADO (Jennifer only) -->
         <div id="notifManageCard" class="card mb-6" style="display:none">
-          <div class="card-header"><div class="card-title">📢 Publicar recado para todos</div><div class="card-sub">Aparece na visão geral de todos os usuários</div></div>
+          <div class="card-header"><div class="card-title">📢 Publicar recado</div><div class="card-sub">Aparece para todos os usuários com as opções abaixo</div></div>
           <div class="card-body">
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:12px">
               <div class="form-group"><label class="form-label">Tipo</label>
                 <select class="form-select" id="notifTipo">
                   <option value="info">💙 Informativo</option>
-                  <option value="success">💚 Conquista / Parabéns</option>
+                  <option value="success">💚 Conquista</option>
                   <option value="warning">💛 Atenção</option>
                   <option value="urgent">❤️ Urgente</option>
                 </select>
               </div>
+              <div class="form-group"><label class="form-label">Prioridade</label>
+                <select class="form-select" id="notifPriority">
+                  <option value="normal">Normal</option>
+                  <option value="high">🔥 Alta (destaque)</option>
+                </select>
+              </div>
+              <div class="form-group"><label class="form-label">Destinatário</label>
+                <select class="form-select" id="notifTarget">
+                  <option value="">🌐 Todos</option>
+                  <option value="energizados">⚡ Energizados</option>
+                  <option value="ivolt">⚡ iVolt</option>
+                  <option value="aza">🔥 AZA</option>
+                </select>
+              </div>
+              <div class="form-group"><label class="form-label">Expira em</label>
+                <select class="form-select" id="notifExpira">
+                  <option value="">Sem expiração</option>
+                  <option value="1">1 dia</option>
+                  <option value="3">3 dias</option>
+                  <option value="7">7 dias</option>
+                  <option value="14">14 dias</option>
+                </select>
+              </div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
               <div class="form-group"><label class="form-label">Título</label>
                 <input class="form-input" id="notifTitulo" placeholder="ex: Atenção equipe!">
+              </div>
+              <div class="form-group"><label class="form-label">Meta numérica (opcional)</label>
+                <input class="form-input" id="notifMetaNum" type="number" placeholder="ex: 500 (ligações, R$...)">
               </div>
             </div>
             <div class="form-group"><label class="form-label">Mensagem</label>
               <textarea class="form-input" id="notifTexto" rows="3" style="height:auto;padding:10px 12px;resize:vertical" placeholder="Digite o recado aqui..."></textarea>
             </div>
+            <div id="notifLeitraStatus" style="font-size:12px;color:var(--gray-500);margin-bottom:10px"></div>
             <div style="display:flex;gap:10px;flex-wrap:wrap">
-              <button class="btn btn-green" onclick="publicarRecado()">📢 Publicar recado</button>
+              <button class="btn btn-green" onclick="publicarRecado()">📢 Publicar</button>
               <button class="btn btn-outline" onclick="excluirRecado()">🗑️ Remover recado atual</button>
             </div>
           </div>
@@ -1087,8 +1214,25 @@ tbody tr:hover td{background:var(--gray-50);}
 
       <!-- HISTÓRICO RECADOS (todos) -->
       <div id="pageRecados" class="page">
+        <!-- Filtros -->
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;align-items:center">
+          <span style="font-size:11px;font-weight:600;color:var(--gray-500);text-transform:uppercase;letter-spacing:0.05em">Filtrar:</span>
+          <select class="form-select" id="recadosFiltroTipo" style="width:160px;height:34px;font-size:12px" onchange="renderRecadosPage()">
+            <option value="">Todos os tipos</option>
+            <option value="info">💙 Informativo</option>
+            <option value="success">💚 Conquista</option>
+            <option value="warning">💛 Atenção</option>
+            <option value="urgent">❤️ Urgente</option>
+          </select>
+          <select class="form-select" id="recadosFiltroTime" style="width:160px;height:34px;font-size:12px" onchange="renderRecadosPage()">
+            <option value="">Todos os times</option>
+            <option value="">🌐 Geral</option>
+          </select>
+        </div>
         <div class="card">
-          <div class="card-header"><div class="card-title">📢 Histórico de recados</div><div class="card-sub">Todos os comunicados publicados pela gestora</div></div>
+          <div class="card-header">
+            <div><div class="card-title">📢 Histórico de recados</div><div class="card-sub">Todos os comunicados publicados</div></div>
+          </div>
           <div class="card-body" style="padding:0"><div id="recadosHistList"></div></div>
         </div>
       </div>
@@ -1121,8 +1265,6 @@ tbody tr:hover td{background:var(--gray-50);}
 
       <!-- MINHA VISÃO (agent) -->
       <div id="pageAgentView" class="page">
-        <!-- Recado da gestora (visível para todos) -->
-        <div id="agentNotifBannerWrap" style="display:none"></div>
         <div class="agent-header">
           <div style="color:#7dd3a8;font-size:10px;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:3px" id="agentTypeLabel">Meu desempenho</div>
           <h2 id="agentViewName">—</h2>
@@ -1315,7 +1457,7 @@ tbody tr:hover td{background:var(--gray-50);}
           </select>
         </div>
         <div class="form-group" id="fieldTeam"><label class="form-label">Time</label>
-          <select class="form-select" id="agentTeam"><option value="energizados">⚡ Energizados</option><option value="ivolt">⚡ iVolt</option><option value="aza">🔥 AZA</option></select>
+          <select class="form-select" id="agentTeam"></select>
         </div>
         <div class="form-group" id="fieldType"><label class="form-label">Tipo</label>
           <select class="form-select" id="agentType"><option value="call">📞 Ligação</option><option value="chat">💬 Chat</option></select>
@@ -1421,6 +1563,30 @@ tbody tr:hover td{background:var(--gray-50);}
     <div class="modal-footer">
       <button class="btn btn-outline" onclick="closeModal('modalEditTime')">Cancelar</button>
       <button class="btn btn-green" onclick="saveEditTime()">💾 Salvar alterações</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL MOVER DE TIME -->
+<div class="modal-overlay" id="modalMoverTime">
+  <div class="modal" style="width:400px">
+    <div class="modal-header">
+      <span class="modal-title">↔️ Mover agente de time</span>
+      <button class="modal-close" onclick="closeModal('modalMoverTime')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div style="background:var(--gray-50);border-radius:var(--radius);padding:12px 14px;margin-bottom:16px;font-size:13px;color:var(--gray-600)">
+        Movendo: <strong id="moverAgentLabel" style="color:var(--gray-900)">—</strong>
+      </div>
+      <input type="hidden" id="moverAgentId">
+      <div class="form-group">
+        <label class="form-label">Novo time</label>
+        <select class="form-select" id="moverNovoTime"></select>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('modalMoverTime')">Cancelar</button>
+      <button class="btn btn-green" onclick="salvarMoverTime()">↔️ Mover agente</button>
     </div>
   </div>
 </div>
@@ -1584,7 +1750,11 @@ let db = {
   dailyLog: [],  // {ts, date, teamKey, ligacao, chat, user}
 
   // Notificações / recados
-  notificacoes: [],   // {id, texto, tipo, titulo, autor, ts}
+  notificacoes: [],   // {id, texto, tipo, titulo, autor, ts, expira?, timeTarget?, metaNum?, priority?}
+  notifLidas: {},     // {notifId: [userId, ...]}  — who read
+  notifReacoes: {},   // {notifId: {emoji: [userName, ...]}}
+  notifComentarios: {}, // {notifId: [{user, texto, ts}]}
+  notifNaoVistas: {}, // {userId: notifId} — for badge
   notifHistorico: [], // histórico de todas as notificações
 
   // Log de alterações
@@ -1762,6 +1932,7 @@ function doLogin(){
 }
 function quickLogin(u,p){document.getElementById('loginUser').value=u;document.getElementById('loginPass').value=p;doLogin();}
 function doLogout(){
+  try{ sessionStorage.removeItem('igreen_user'); }catch(e){}
   currentUser=null;adminViewTeam='all';
   document.getElementById('app').style.display='none';
   document.getElementById('loginScreen').style.display='flex';
@@ -1770,6 +1941,8 @@ function doLogout(){
 }
 
 function startApp(){
+  // Persist session so page refresh doesn't log out
+  try{ sessionStorage.setItem('igreen_user', JSON.stringify({login:currentUser.login, pass:currentUser.pass})); }catch(e){}
   document.getElementById('loginScreen').style.display='none';
   document.getElementById('app').style.display='block';
   document.getElementById('siteFooter').style.marginLeft='248px';
@@ -1864,6 +2037,8 @@ function renderPage(id){
     relatorio:'Relatório',agentes:'Agentes',times:'Gerenciar Times',dados:'Dados & Meses',senhas:'Senhas',agentView:'Meu desempenho'};
   document.getElementById('topbarTitle').textContent=titles[id]||id;
   updateTopbarTeamBadge();
+  // Show notification banner to ALL users on every page
+  renderNotifBanner();
 
   // Oculta seletor de métrica na aba Chat (não se aplica)
   const isChatPage = id==='chat';
@@ -1924,8 +2099,7 @@ function renderOverview(){
   if(isAdmin){
     buildTeamsTabs('adminTeamsNav',adminViewTeam,`function(t){adminViewTeam=t;renderOverview();}`);
   }
-  // Notification banner for everyone
-  renderNotifBanner();
+  // Notification banner is shown globally by renderPage — no duplicate call needed
   // Show manage card only for Jennifer
   const notifManage=document.getElementById('notifManageCard');
   if(notifManage) notifManage.style.display=currentUser.login==='jennifer.silveira'?'block':'none';
@@ -2455,9 +2629,10 @@ function renderAgentesPage(){
       <td>${isAdminUser?'—':`<span class="badge ${isChatAg?'badge-purple':'badge-blue'}">${isChatAg?'💬 Chat':'📞 Ligação'}</span>`}</td>
       <td style="font-family:var(--mono);font-size:13px">${lastVal!==null?fmt(lastVal):'<span style="color:var(--gray-300)">—</span>'}</td>
       <td>${u.dataName?`<span style="font-size:11px;color:var(--gray-500)">${u.dataName}</span>`:'—'}</td>
-      <td><div style="display:flex;gap:5px">
+      <td><div style="display:flex;gap:5px;flex-wrap:wrap">
         ${canSelfEdit?`<button class="btn btn-sm btn-blue" onclick="abrirModalSenha(${u.id})" title="Editar meu perfil">✏️ Meu perfil</button>`:''}
         ${canEdit?`<button class="btn btn-sm btn-outline" onclick="openEditAgent(${u.id})">✏️</button>`:''}
+        ${isSuperAdmin&&!isAdminUser?`<button class="btn btn-sm" style="background:var(--amber-light);color:var(--amber)" onclick="openMoverTime(${u.id})" title="Mover de time">↔️</button>`:''}
         ${canDelete?`<button class="btn btn-sm btn-red" onclick="deleteAgent(${u.id})">🗑️</button>`:''}
         ${!canEdit&&!canDelete&&!canSelfEdit?'—':''}
       </div></td>
@@ -2516,6 +2691,9 @@ function onRoleChange(){
 }
 
 function openModalAddAgent(){
+  // Populate teams dynamically
+  const ts=document.getElementById('agentTeam');if(ts)ts.innerHTML=Object.entries(TEAMS).map(([k,t])=>`<option value="${k}">${t.icon} ${t.label}</option>`).join('');
+  
   editingAgentId=null;
   document.getElementById('modalAgentTitle').textContent='Novo acesso';
   ['agentName','agentLogin','agentPass','agentDataName'].forEach(id=>document.getElementById(id).value='');
@@ -2531,6 +2709,9 @@ function openModalAddAgent(){
 }
 
 function openEditAgent(id){
+  // Populate teams dynamically
+  const ts=document.getElementById('agentTeam');if(ts)ts.innerHTML=Object.entries(TEAMS).map(([k,t])=>`<option value="${k}">${t.icon} ${t.label}</option>`).join('');
+  
   const u=db.users.find(x=>x.id===id);if(!u)return;editingAgentId=id;
   document.getElementById('modalAgentTitle').textContent='Editar acesso';
   document.getElementById('agentName').value=u.name;
@@ -2585,6 +2766,37 @@ function saveAgent(){
   }
   closeModal('modalAddAgent');renderAgentesPage();
 }
+function openMoverTime(userId){
+  if(currentUser.login!=='jennifer.silveira'){showToast('Sem permissão.',true);return;}
+  const u=db.users.find(x=>x.id===userId);
+  if(!u) return;
+  document.getElementById('moverAgentId').value=userId;
+  document.getElementById('moverAgentLabel').textContent=`${u.name} (atualmente: ${TEAMS[u.team]?.icon||''} ${TEAMS[u.team]?.label||u.team})`;
+  // Populate teams excluding current
+  const sel=document.getElementById('moverNovoTime');
+  sel.innerHTML=Object.entries(TEAMS).map(([k,t])=>`<option value="${k}" ${k===u.team?'disabled style="color:var(--gray-300)"':''}>${t.icon} ${t.label}${k===u.team?' (atual)':''}</option>`).join('');
+  // Select first non-current
+  const first=Object.keys(TEAMS).find(k=>k!==u.team);
+  if(first) sel.value=first;
+  openModal('modalMoverTime');
+}
+
+function salvarMoverTime(){
+  if(currentUser.login!=='jennifer.silveira'){showToast('Sem permissão.',true);return;}
+  const userId=parseInt(document.getElementById('moverAgentId').value);
+  const novoTime=document.getElementById('moverNovoTime').value;
+  const u=db.users.find(x=>x.id===userId);
+  if(!u){showToast('Agente não encontrado.',true);return;}
+  if(novoTime===u.team){showToast('Selecione um time diferente.',true);return;}
+  const oldTeam=TEAMS[u.team]?.label||u.team;
+  const newTeam=TEAMS[novoTime]?.label||novoTime;
+  u.team=novoTime;
+  addLog('Agente movido de time',`${u.name}: ${oldTeam} → ${newTeam}`,'#e67e22');
+  showToast(`${u.name} movido para ${newTeam}!`);
+  closeModal('modalMoverTime');
+  renderAgentesPage();
+}
+
 function deleteAgent(id){
   if(currentUser.login!=='jennifer.silveira'){showToast('Apenas Jennifer Silveira pode excluir acessos.',true);return;}
   const u=db.users.find(x=>x.id===id);
@@ -2838,9 +3050,6 @@ function salvarSenha(){
 function renderAgentView(){
   const dataName=currentUser.dataName;
   if(!dataName){document.getElementById('pageAgentView').innerHTML=`<div style="text-align:center;padding:60px 20px;color:var(--gray-400)"><div style="font-size:40px">⚠️</div><p style="margin-top:12px">Perfil não configurado. Contate a Jennifer.</p></div>`;return;}
-
-  // Show recado da gestora para agentes
-  renderAgentNotifBanner();
 
   const isChatAgent=currentUser.agentType==='chat';
   const myTeam=currentUser.team;
@@ -4249,87 +4458,233 @@ const _origSaveDado=saveDado;
 const NOTIF_ICONS={info:'💙',success:'💚',warning:'💛',urgent:'❤️'};
 const NOTIF_TYPES={info:'Informativo',success:'Conquista',warning:'Atenção',urgent:'Urgente'};
 
-function renderNotifBanner(){
-  const wrap=document.getElementById('notifBannerWrap');
-  if(!wrap) return;
-  if(!db.notificacoes||!db.notificacoes.length){ wrap.style.display='none'; return; }
-  const n=db.notificacoes[0];
-  wrap.style.display='block';
-  wrap.innerHTML=`<div class="notif-banner ${n.tipo}">
-    <div class="notif-icon">${NOTIF_ICONS[n.tipo]||'📢'}</div>
-    <div class="notif-body">
-      <div class="notif-title">${n.titulo||'Recado da gestora'}</div>
-      <div class="notif-text">${n.texto}</div>
-      <div class="notif-meta">Publicado por ${n.autor} · ${n.ts}</div>
-    </div>
-  </div>`;
-  const manage=document.getElementById('notifManageCard');
-  if(manage) manage.style.display=currentUser?.login==='jennifer.silveira'?'block':'none';
+function notifExpirou(n){
+  if(!n.expiraDias) return false;
+  try{
+    // Parse ts "DD/MM/YYYY, HH:MM:SS"
+    const parts = n.ts.split(/[,\/: ]+/);
+    const pub = new Date(parts[2], parts[1]-1, parts[0], parts[3]||0, parts[4]||0);
+    const diffDias = (Date.now() - pub.getTime()) / (1000*60*60*24);
+    return diffDias > parseInt(n.expiraDias);
+  }catch(e){ return false; }
 }
 
-// Banner para agentes (na página agentView)
-function renderAgentNotifBanner(){
-  const wrap=document.getElementById('agentNotifBannerWrap');
+function notifVisibleToMe(n){
+  if(!n.timeTarget) return true;
+  if(currentUser?.role==='admin') return true; // admins see all
+  return currentUser?.team === n.timeTarget;
+}
+
+function renderNotifBanner(){
+  const wrap = document.getElementById('globalNotifBannerWrap');
   if(!wrap) return;
-  if(!db.notificacoes||!db.notificacoes.length){ wrap.style.display='none'; return; }
-  const n=db.notificacoes[0];
+
+  // Filter active, non-expired, targeted
+  const active = (db.notificacoes||[]).filter(n=>!notifExpirou(n)&&notifVisibleToMe(n));
+  if(!active.length){
+    wrap.style.display='none';
+    wrap.innerHTML='';
+    // Clear badge
+    document.querySelectorAll('.nav-badge-dot').forEach(el=>el.remove());
+    return;
+  }
+
+  const n = active[0];
+  const userId = currentUser?.login||'';
+  const lidas = db.notifLidas?.[n.id]||[];
+  const jáLi = lidas.includes(userId);
+  const reacoes = db.notifReacoes?.[n.id]||{};
+  const comentarios = db.notifComentarios?.[n.id]||[];
+  const isJennifer = currentUser?.login==='jennifer.silveira';
+  const isHigh = n.priority==='high';
+
+  // Tags
+  let tags = '';
+  if(n.timeTarget) tags += `<span class="meta-tag direcao">🎯 ${TEAMS[n.timeTarget]?.label||n.timeTarget}</span> `;
+  if(n.expiraDias) tags += `<span class="meta-tag expira">⏱ Expira em ${n.expiraDias}d</span> `;
+  if(n.metaNum) tags += `<span class="meta-tag meta-num">🎯 Meta: ${fmt(n.metaNum)}</span> `;
+
+  // Reaction counts
+  const EMOJI_OPTIONS = ['👍','💪','✅','🔥','❤️'];
+  const reactionHtml = EMOJI_OPTIONS.map(e=>{
+    const who = reacoes[e]||[];
+    const mine = who.includes(currentUser?.name||'');
+    return `<button class="reaction-btn ${mine?'mine':''}" onclick="toggleReacao('${n.id}','${e}')" title="${who.slice(0,5).join(', ')}">${e}${who.length?` ${who.length}`:''}</button>`;
+  }).join('');
+
+  // Read status for Jennifer
+  let readStatusHtml = '';
+  if(isJennifer){
+    const totalUsers = db.users.filter(u=>u.role!=='admin'||u.login==='jennifer.silveira').length;
+    readStatusHtml = `<span style="font-size:11px;color:var(--gray-500)">👁 ${lidas.length}/${totalUsers} viram</span>`;
+  }
+
+  // Comments
+  const commentHtml = comentarios.slice(-3).map(cm=>`
+    <div class="comment-item"><strong style="font-size:12px">${cm.user}</strong> <span style="color:var(--gray-500);font-size:11px">${cm.ts}</span><br>${cm.texto}</div>`).join('');
+
   wrap.style.display='block';
-  wrap.innerHTML=`<div class="notif-banner ${n.tipo}" style="margin-bottom:20px">
-    <div class="notif-icon">${NOTIF_ICONS[n.tipo]||'📢'}</div>
-    <div class="notif-body">
-      <div class="notif-title">${n.titulo||'Recado da gestora'}</div>
-      <div class="notif-text">${n.texto}</div>
-      <div class="notif-meta">Publicado por ${n.autor} · ${n.ts}</div>
+  wrap.style.marginBottom='20px';
+  wrap.innerHTML=`<div class="notif-banner ${n.tipo}${isHigh?' notif-priority-high':''}" style="margin-bottom:0">
+    ${isHigh?'<div style="position:absolute;top:-1px;left:-1px;right:-1px;height:4px;background:linear-gradient(90deg,#c0392b,#e74c3c);border-radius:var(--radius-lg) var(--radius-lg) 0 0"></div>':''}
+    <div class="notif-icon" style="font-size:${isHigh?'28px':'22px'}">${NOTIF_ICONS[n.tipo]||'📢'}</div>
+    <div class="notif-body" style="flex:1">
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+        <div class="notif-title" style="font-size:${isHigh?'16px':'14px'}">${n.titulo||'Recado da gestora'}</div>
+        ${isHigh?'<span style="background:#fef2f2;color:#c0392b;font-size:10px;font-weight:700;padding:2px 7px;border-radius:99px;letter-spacing:0.05em">PRIORIDADE ALTA</span>':''}
+      </div>
+      ${tags?`<div style="margin:4px 0">${tags}</div>`:''}
+      <div class="notif-text" style="margin:6px 0">${n.texto}</div>
+      <div class="notif-meta-row">
+        <span class="notif-meta">Publicado por ${n.autor} · ${n.ts}</span>
+        ${readStatusHtml}
+        <button class="read-check ${jáLi?'done':'pending'}" onclick="marcarComoLido('${n.id}')">
+          ${jáLi?'✅ Li':'👁 Marcar como lido'}
+        </button>
+      </div>
+      <div class="notif-reactions" style="margin-top:8px">${reactionHtml}</div>
+      ${commentHtml?`<div style="margin-top:8px">${commentHtml}</div>`:''}
+      <div style="margin-top:8px;display:flex;gap:8px">
+        <textarea class="comment-input" id="commentInput_${n.id}" rows="1" placeholder="Deixe um comentário..." style="flex:1;height:36px"></textarea>
+        <button class="btn btn-sm btn-outline" onclick="enviarComentario('${n.id}')">Enviar</button>
+      </div>
     </div>
   </div>`;
+
+  // Badge on nav item
+  updateRecadoBadge(!jáLi);
+
+  // Show manage card only for Jennifer
+  const manage = document.getElementById('notifManageCard');
+  if(manage) manage.style.display = isJennifer ? 'block' : 'none';
+
+  // Update leitura status in manage card
+  if(isJennifer){
+    const el = document.getElementById('notifLeitraStatus');
+    if(el && n){
+      const totalUsers = db.users.filter(u=>notifVisibleToMe(n)).length;
+      el.innerHTML = `<span style="color:var(--green)">👁 ${lidas.length} de ${totalUsers} usuário(s) marcaram como lido</span>`;
+    }
+  }
+}
+
+function salvarNotificacoesLocal(){
+  // Firebase é a fonte da verdade — não precisa de localStorage
+}
+function carregarNotificacoesLocal(){
+  // Firebase usa onSnapshot em tempo real
 }
 
 function publicarRecado(){
   if(currentUser.login!=='jennifer.silveira'){showToast('Sem permissão.',true);return;}
-  const tipo=document.getElementById('notifTipo').value;
+    const tipo=document.getElementById('notifTipo').value;
   const titulo=document.getElementById('notifTitulo').value.trim();
   const texto=document.getElementById('notifTexto').value.trim();
+  const priority=document.getElementById('notifPriority')?.value||'normal';
+  const timeTarget=document.getElementById('notifTarget')?.value||'';
+  const expiraDias=document.getElementById('notifExpira')?.value||'';
+  const metaNum=parseInt(document.getElementById('notifMetaNum')?.value)||0;
   if(!texto){showToast('Digite o texto do recado.',true);return;}
-  const notif={id:Date.now(),tipo,titulo,texto,autor:currentUser.name,ts:new Date().toLocaleString('pt-BR')};
-  db.notificacoes=[notif];
-  if(!db.notifHistorico) db.notifHistorico=[];
-  db.notifHistorico.unshift({...notif});
-  if(!db.recadosHistorico) db.recadosHistorico=[];
-  db.recadosHistorico.unshift({...notif});
+  const notif={id:Date.now(),tipo,titulo,texto,autor:currentUser.name,ts:new Date().toLocaleString('pt-BR'),
+    priority,timeTarget:timeTarget||null,expiraDias:expiraDias||null,metaNum:metaNum||null};
   addLog('Recado publicado',`"${titulo||texto.slice(0,40)}"`, '#1a7a45');
-  showToast('Recado publicado para todos!');
   document.getElementById('notifTexto').value='';
   document.getElementById('notifTitulo').value='';
-  renderNotifBanner();
+  if(window._salvarRecadoFirebase){
+    window._salvarRecadoFirebase(notif).then(()=>{
+      showToast('Recado publicado para todos! ✅');
+    }).catch(()=>{
+      // Fallback local se Firebase não configurado
+      db.notificacoes=[notif];
+      if(!db.recadosHistorico) db.recadosHistorico=[];
+      db.recadosHistorico.unshift({...notif});
+      showToast('Recado publicado (modo local)');
+      renderNotifBanner();
+    });
+  } else {
+    db.notificacoes=[notif];
+    if(!db.recadosHistorico) db.recadosHistorico=[];
+    db.recadosHistorico.unshift({...notif});
+    showToast('Recado publicado (modo local)');
+    renderNotifBanner();
+  }
 }
 
 function excluirRecado(){
   if(currentUser.login!=='jennifer.silveira'){showToast('Sem permissão.',true);return;}
   if(!confirm('Remover o recado atual?')) return;
   addLog('Recado removido', db.notificacoes[0]?.titulo||'—', '#c0392b');
-  db.notificacoes=[];
-  showToast('Recado removido.');
-  renderNotifBanner();
+  if(window._removerRecadoFirebase){
+    window._removerRecadoFirebase().then(()=>{
+      showToast('Recado removido para todos! ✅');
+    }).catch(()=>{
+      db.notificacoes=[];
+      showToast('Recado removido (modo local)');
+      renderNotifBanner();
+    });
+  } else {
+    db.notificacoes=[];
+    showToast('Recado removido (modo local)');
+    renderNotifBanner();
+  }
 }
 
 function renderRecadosPage(){
   const list=document.getElementById('recadosHistList');
   if(!list) return;
   const isSuperAdmin = currentUser.login==='jennifer.silveira';
-  const hist=db.recadosHistorico||[];
-  if(!hist.length){list.innerHTML='<div style="padding:32px;text-align:center;color:var(--gray-400);font-size:13px">Nenhum recado publicado ainda.</div>';return;}
-  list.innerHTML=hist.map((n,i)=>`
-    <div style="padding:18px 22px;border-bottom:1px solid var(--gray-100);position:relative">
+  let hist=db.recadosHistorico||[];
+
+  // Filters
+  const filtroTipo = document.getElementById('recadosFiltroTipo')?.value||'';
+  const filtroTime = document.getElementById('recadosFiltroTime')?.value||'';
+
+  // Populate time filter dynamically
+  const timeSel = document.getElementById('recadosFiltroTime');
+  if(timeSel && timeSel.options.length<=2){
+    Object.entries(TEAMS).forEach(([k,t])=>{
+      if(![...timeSel.options].find(o=>o.value===k)){
+        const opt=document.createElement('option');opt.value=k;opt.textContent=`${t.icon} ${t.label}`;timeSel.appendChild(opt);
+      }
+    });
+  }
+
+  if(filtroTipo) hist=hist.filter(n=>n.tipo===filtroTipo);
+  if(filtroTime) hist=hist.filter(n=>n.timeTarget===filtroTime);
+
+  if(!hist.length){list.innerHTML='<div style="padding:32px;text-align:center;color:var(--gray-400);font-size:13px">Nenhum recado encontrado.</div>';return;}
+
+  list.innerHTML=hist.map((n,i)=>{
+    const lidas = db.notifLidas?.[n.id]||[];
+    const reacoes = db.notifReacoes?.[n.id]||{};
+    const comentarios = db.notifComentarios?.[n.id]||[];
+    const expirado = notifExpirou(n);
+    let tags = '';
+    if(n.timeTarget) tags+=`<span class="meta-tag direcao">🎯 ${TEAMS[n.timeTarget]?.label||n.timeTarget}</span> `;
+    if(n.expiraDias) tags+=`<span class="meta-tag expira${expirado?' line-through':''}">${expirado?'❌ Expirado':'⏱ '+n.expiraDias+'d'}</span> `;
+    if(n.metaNum) tags+=`<span class="meta-tag meta-num">🎯 Meta: ${fmt(n.metaNum)}</span> `;
+    if(n.priority==='high') tags+=`<span style="background:#fef2f2;color:#c0392b;font-size:10px;font-weight:700;padding:2px 7px;border-radius:99px">ALTA</span> `;
+    const EMOJI_OPTIONS=['👍','💪','✅','🔥','❤️'];
+    const reactionSummary = EMOJI_OPTIONS.map(e=>{const who=reacoes[e]||[];return who.length?`${e} ${who.length}`:''}).filter(Boolean).join('  ');
+    return `<div style="padding:16px 22px;border-bottom:1px solid var(--gray-100);position:relative;opacity:${expirado?'0.6':'1'}">
       <div class="notif-banner ${n.tipo}" style="margin:0">
         <div class="notif-icon">${NOTIF_ICONS[n.tipo]||'📢'}</div>
         <div class="notif-body">
           <div class="notif-title">${n.titulo||'Recado'}</div>
+          ${tags?`<div style="margin:4px 0">${tags}</div>`:''}
           <div class="notif-text">${n.texto}</div>
-          <div class="notif-meta">Publicado por ${n.autor} · ${n.ts}</div>
+          <div class="notif-meta-row">
+            <span class="notif-meta">Publicado por ${n.autor} · ${n.ts}</span>
+            ${isSuperAdmin?`<span style="font-size:11px;color:var(--gray-500)">👁 ${lidas.length} leram</span>`:''}
+            ${reactionSummary?`<span style="font-size:12px">${reactionSummary}</span>`:''}
+            ${comentarios.length?`<span style="font-size:11px;color:var(--gray-400)">💬 ${comentarios.length} comentário(s)</span>`:''}
+          </div>
+          ${comentarios.length?`<div style="margin-top:8px">${comentarios.slice(-2).map(cm=>`<div class="comment-item"><strong style="font-size:11px">${cm.user}</strong> · <span style="color:var(--gray-400);font-size:10px">${cm.ts}</span><br><span style="font-size:12px">${cm.texto}</span></div>`).join('')}</div>`:''}
         </div>
       </div>
-      ${isSuperAdmin?`<button onclick="deletarRecadoHistorico(${i})" style="position:absolute;top:18px;right:18px;background:none;border:none;cursor:pointer;font-size:14px;color:var(--gray-300);line-height:1;padding:4px 6px;border-radius:6px" onmouseover="this.style.color='var(--red)';this.style.background='var(--red-light)'" onmouseout="this.style.color='var(--gray-300)';this.style.background='none'" title="Excluir (só você vê)">✕</button>`:''}
-    </div>`).join('');
+      ${isSuperAdmin?`<button onclick="deletarRecadoHistorico(${i})" style="position:absolute;top:12px;right:12px;background:none;border:none;cursor:pointer;font-size:13px;color:var(--gray-300);padding:4px 6px;border-radius:6px" onmouseover="this.style.color='var(--red)';this.style.background='var(--red-light)'" onmouseout="this.style.color='var(--gray-300)';this.style.background='none'" title="Excluir silenciosamente">✕</button>`:''}
+    </div>`;
+  }).join('');
 }
 
 // Exclusão silenciosa — só Jennifer, sem registro em log
@@ -4337,6 +4692,9 @@ function deletarRecadoHistorico(index){
   if(currentUser.login!=='jennifer.silveira') return;
   if(!confirm('Excluir este recado do histórico? Esta ação não ficará registrada.')) return;
   db.recadosHistorico.splice(index,1);
+  if(window._atualizarHistoricoFirebase){
+    window._atualizarHistoricoFirebase(db.recadosHistorico);
+  }
   renderRecadosPage();
 }
 
@@ -4539,6 +4897,15 @@ function exportarCSV(){
 // TIMES — GERENCIAR (Jennifer only)
 // =============================================
 // =============================================
+function updateAllTeamSelects(){
+  const opts=Object.entries(TEAMS).map(([k,t])=>`<option value="${k}">${t.icon} ${t.label}</option>`).join('');
+  // Update all static team selects across all pages
+  ['diarioTeam','diarioCsvTeam','dadoTeam','dadoChatTeam','loteTeam','ligManTeam','ligCsvTeam','ligRecTeam','ligRecDelTeam','ligDelTeam','recAddTeam','recDelTeam','dadoChatTeam','delTeamSelect'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el){ const val=el.value; el.innerHTML=opts; if(val) el.value=val; }
+  });
+}
+
 function renderTimesPage(){
   if(currentUser.login!=='jennifer.silveira'){ showToast('Acesso restrito.',true); return; }
 
@@ -4669,6 +5036,8 @@ function addTime(){
   document.getElementById('newTeamIcon').value='';
   document.getElementById('newTeamColorHex').value='#1a7a45';
   document.getElementById('newTeamColor').value='#1a7a45';
+  // Update team selects in dados and diario forms dynamically
+  updateAllTeamSelects();
   renderTimesPage();
 }
 
@@ -4700,7 +5069,71 @@ function deleteTime(){
 // =============================================
 // INIT
 // =============================================
-document.getElementById('loginUser').focus();
+
+// =============================================
+// RECADOS — INTERAÇÕES (leitura, reação, comentário, badge)
+// =============================================
+function updateRecadoBadge(temNovo){
+  document.querySelectorAll('.nav-badge-dot').forEach(el=>el.remove());
+  if(!temNovo) return;
+  // Add red dot on recados nav item
+  const navEl = document.getElementById('nav-recados');
+  if(navEl && !navEl.querySelector('.nav-badge-dot')){
+    const dot=document.createElement('span');dot.className='nav-badge-dot';navEl.appendChild(dot);
+  }
+}
+
+function marcarComoLido(notifId){
+  const userId = currentUser?.login||'';
+  if(!db.notifLidas) db.notifLidas={};
+  if(!db.notifLidas[notifId]) db.notifLidas[notifId]=[];
+  if(!db.notifLidas[notifId].includes(userId)){
+    db.notifLidas[notifId].push(userId);
+  }
+  renderNotifBanner();
+}
+
+function toggleReacao(notifId, emoji){
+  const userName = currentUser?.name||currentUser?.login||'?';
+  if(!db.notifReacoes) db.notifReacoes={};
+  if(!db.notifReacoes[notifId]) db.notifReacoes[notifId]={};
+  if(!db.notifReacoes[notifId][emoji]) db.notifReacoes[notifId][emoji]=[];
+  const list = db.notifReacoes[notifId][emoji];
+  const idx = list.indexOf(userName);
+  if(idx>=0) list.splice(idx,1); else list.push(userName);
+  renderNotifBanner();
+}
+
+function enviarComentario(notifId){
+  const input = document.getElementById(`commentInput_${notifId}`);
+  if(!input) return;
+  const texto = input.value.trim();
+  if(!texto) return;
+  if(!db.notifComentarios) db.notifComentarios={};
+  if(!db.notifComentarios[notifId]) db.notifComentarios[notifId]=[];
+  db.notifComentarios[notifId].push({
+    user: currentUser?.name||currentUser?.login,
+    texto,
+    ts: new Date().toLocaleString('pt-BR')
+  });
+  input.value='';
+  renderNotifBanner();
+  showToast('Comentário enviado!');
+}
+
+// =============================================
+// Restore session on page load/refresh
+(function(){
+  try{
+    const saved = sessionStorage.getItem('igreen_user');
+    if(saved){
+      const {login, pass} = JSON.parse(saved);
+      const user = db.users.find(x=>x.login===login && x.pass===pass);
+      if(user){ currentUser=user; startApp(); return; }
+    }
+  }catch(e){}
+  document.getElementById('loginUser').focus();
+})();
 </script>
 </body>
 </html>
